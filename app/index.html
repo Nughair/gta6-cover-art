@@ -1,65 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leonida Cover Works — GTA-style cover-art editor</title>
-<link rel="stylesheet" href="./style.css">
+<title>Leonida Cover Works — GTA-style cover art maker</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="app">
-  <section class="controls">
-    <h1>Leonida Cover Works</h1>
-    <p class="tagline">Turn a photo into GTA-style multi-panel cover art: pick a layout, grade the colour, letter the caption, export the poster.</p>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">LCW</div>
+    <div class="brand-text">
+      <h1>Leonida Cover Works</h1>
+      <p>Your photo in. A poster out. Multi-panel cover art with a Vice City grade.</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <label class="field inline">
+      <span>Post size</span>
+      <select id="sizeSelect"></select>
+    </label>
+    <button id="exportBtn" class="primary" type="button">Export PNG</button>
+  </div>
+</header>
 
-    <div class="group">
-      <span class="group-label">Photo for selected panel</span>
-      <label class="file">Upload a photo <input id="photo" type="file" accept="image/*"></label>
-      <div class="row">
-        <button type="button" data-sample="pier">Sample: Pier</button>
-        <button type="button" data-sample="boulevard">Sample: Boulevard</button>
+<main class="workspace">
+  <aside class="rail left">
+    <section class="card">
+      <h2>1 · Photos</h2>
+      <label class="upload">
+        <input id="photoInput" type="file" accept="image/*" multiple>
+        <span>Add your photos</span>
+      </label>
+      <div id="photoTray" class="photo-tray"></div>
+      <p class="hint">Tap a photo to drop it into the selected panel. Photos never leave your machine.</p>
+      <div class="row-buttons">
+        <button id="fillAllBtn" type="button">Fill all panels</button>
+        <button id="shuffleBtn" type="button">Surprise me</button>
       </div>
-      <p class="hint">Click a panel on the cover to select it, then drag inside it to reposition its photo.</p>
-    </div>
+    </section>
+    <section class="card">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li>Add a photo — yours, or start with the demo reel.</li>
+        <li>Pick a panel layout and a colour grade.</li>
+        <li>Drag each panel's photo into place, scroll to zoom.</li>
+        <li>Write your title, hit Export PNG, post it.</li>
+      </ol>
+    </section>
+  </aside>
 
-    <div class="group">
-      <span class="group-label">Layout</span>
-      <div class="row">
-        <button type="button" data-layout="grid" class="active">Classic 2×2 Grid</button>
-        <button type="button" data-layout="hero">Hero + Strips</button>
-      </div>
-    </div>
-
-    <div class="group">
-      <span class="group-label">Colour grade</span>
-      <div class="row wrap">
-        <button type="button" data-grade="vice" class="active">Vice Sunset</button>
-        <button type="button" data-grade="neon">Neon Nights</button>
-        <button type="button" data-grade="golden">Golden Hour</button>
-        <button type="button" data-grade="none">Original</button>
-      </div>
-    </div>
-
-    <div class="group">
-      <label class="group-label" for="zoom">Panel zoom</label>
-      <input id="zoom" type="range" min="1" max="2.4" step="0.01" value="1.15">
-      <label class="group-label" for="caption">Caption</label>
-      <input id="caption" type="text" maxlength="40" value="LEONIDA DREAMS">
-    </div>
-
-    <div class="group">
-      <span class="group-label">Export PNG</span>
-      <div class="row wrap">
-        <button type="button" data-export="1080x1080">1080 × 1080</button>
-        <button type="button" data-export="1080x1350">1080 × 1350</button>
-        <button type="button" data-export="1920x1080">1920 × 1080</button>
-      </div>
-    </div>
-
-    <p id="status" role="status"></p>
+  <section class="stage">
+    <canvas id="preview" width="960" height="540"></canvas>
+    <p class="stage-hint">Click a panel to select it · drag to re-frame its photo · scroll to zoom</p>
   </section>
-  <canvas id="cover" width="900" height="900" aria-label="Cover preview — click a panel to select it, drag to reposition"></canvas>
+
+  <aside class="rail right">
+    <section class="card">
+      <h2>2 · Layout</h2>
+      <div id="layoutSwatches" class="swatches"></div>
+    </section>
+    <section class="card">
+      <h2>3 · Colour grade</h2>
+      <div id="gradeSwatches" class="swatches"></div>
+      <label class="field">
+        <span>Grade strength</span>
+        <input id="gradeStrength" type="range" min="0" max="1" step="0.05" value="0.9">
+      </label>
+    </section>
+    <section class="card">
+      <h2>4 · Lettering</h2>
+      <label class="field">
+        <span>Title</span>
+        <input id="titleInput" type="text" maxlength="26" value="LEONIDA NIGHTS">
+      </label>
+      <label class="field">
+        <span>Caption</span>
+        <input id="captionInput" type="text" maxlength="40" value="One city. No rules.">
+      </label>
+      <label class="field">
+        <span>Title position</span>
+        <select id="titlePos">
+          <option value="top">Top of the cover</option>
+          <option value="bottom">Bottom of the cover</option>
+        </select>
+      </label>
+    </section>
+    <section class="card">
+      <h2>Selected panel</h2>
+      <p id="panelLabel" class="panel-label">Panel 1 of 4</p>
+      <label class="field">
+        <span>Photo</span>
+        <select id="panelPhoto"></select>
+      </label>
+      <label class="field">
+        <span>Panel grade</span>
+        <select id="panelGrade"></select>
+      </label>
+      <label class="field">
+        <span>Zoom</span>
+        <input id="panelZoom" type="range" min="0.4" max="4" step="0.02" value="1">
+      </label>
+    </section>
+  </aside>
 </main>
-<script type="module" src="./src/studio.js"></script>
+
+<footer class="footbar">
+  <span>Leonida Cover Works — an original cover-art studio. Fonts: Anton (SIL Open Font License), see app/fonts/OFL.txt.</span>
+</footer>
+
+<script type="module" src="src/main.js"></script>
 </body>
 </html>

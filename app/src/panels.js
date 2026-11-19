@@ -1,47 +1,120 @@
-// panels.js — poster layouts for Leonida Cover Works.
-// A layout is a list of panel rectangles in normalised cover coordinates
-// (0..1 on both axes). The renderer multiplies by the real canvas size, so
-// the same layout works for the editor preview and every export size.
+// panels.js — the five multi-panel poster layouts of Leonida Cover Works.
+//
+// Every layout is a list of panels in normalised cover space: x grows to the
+// right, y grows downward, both run 0..1, and each panel is a polygon of
+// [x, y] points. Because the geometry is normalised, the same layout renders
+// untouched into a square post, a portrait post or a wide banner — only the
+// canvas it is scaled into changes. The angled cuts are deliberate: GTA-style
+// covers never slice a poster into polite rectangles, the dividers lean.
 
-// Classic 2x2 grid: four equal panels with a thin gutter between them.
-function gridLayout(g) {
-  const w = (1 - g) / 2;
-  return [
-    { x: 0, y: 0, w, h: w },
-    { x: w + g, y: 0, w, h: w },
-    { x: 0, y: w + g, w, h: w },
-    { x: w + g, y: w + g, w, h: w },
-  ];
+export const LAYOUTS = [
+  {
+    id: 'vice-grid',
+    name: 'Vice Grid',
+    blurb: 'The classic four-panel grid with leaning dividers',
+    panels: [
+      { points: [[0, 0], [0.52, 0], [0.46, 0.52], [0, 0.55]] },
+      { points: [[0.52, 0], [1, 0], [1, 0.48], [0.46, 0.52]] },
+      { points: [[0, 0.55], [0.46, 0.52], [0.54, 1], [0, 1]] },
+      { points: [[0.46, 0.52], [1, 0.48], [1, 1], [0.54, 1]] },
+    ],
+  },
+  {
+    id: 'triptych',
+    name: 'Triptych',
+    blurb: 'Three tall shards, cut on the diagonal',
+    panels: [
+      { points: [[0, 0], [0.38, 0], [0.30, 1], [0, 1]] },
+      { points: [[0.38, 0], [0.68, 0], [0.62, 1], [0.30, 1]] },
+      { points: [[0.68, 0], [1, 0], [1, 1], [0.62, 1]] },
+    ],
+  },
+  {
+    id: 'hero-strip',
+    name: 'Hero & Strips',
+    blurb: 'One wide hero scene over three story strips',
+    panels: [
+      { points: [[0, 0], [1, 0], [1, 0.58], [0, 0.62]] },
+      { points: [[0, 0.62], [0.34, 0.60], [0.36, 1], [0, 1]] },
+      { points: [[0.34, 0.60], [0.67, 0.585], [0.68, 1], [0.36, 1]] },
+      { points: [[0.67, 0.585], [1, 0.58], [1, 1], [0.68, 1]] },
+    ],
+  },
+  {
+    id: 'shards',
+    name: 'Shards',
+    blurb: 'Four diagonal slices, like glass after a joyride',
+    panels: [
+      { points: [[0, 0], [0.42, 0], [0.18, 1], [0, 1]] },
+      { points: [[0.42, 0], [0.66, 0], [0.44, 1], [0.18, 1]] },
+      { points: [[0.66, 0], [0.86, 0], [0.68, 1], [0.44, 1]] },
+      { points: [[0.86, 0], [1, 0], [1, 1], [0.68, 1]] },
+    ],
+  },
+  {
+    id: 'magazine',
+    name: 'Magazine',
+    blurb: 'A single full-bleed scene with a masthead title',
+    panels: [
+      { points: [[0, 0], [1, 0], [1, 1], [0, 1]] },
+    ],
+  },
+];
+
+export function layoutById(id) {
+  return LAYOUTS.find((layout) => layout.id === id) || LAYOUTS[0];
 }
 
-// Hero-top: one wide cinematic panel over three vertical strips.
-function heroLayout(g) {
-  const heroH = 0.58;
-  const stripW = (1 - g * 2) / 3;
-  const stripH = 1 - heroH - g;
-  const panels = [{ x: 0, y: 0, w: 1, h: heroH }];
-  for (let i = 0; i < 3; i++) {
-    panels.push({ x: i * (stripW + g), y: heroH + g, w: stripW, h: stripH });
+// The axis-aligned box a panel's photo is fitted into before the polygon
+// clips it: cover-fit works on boxes, the polygon only decides what shows.
+export function panelBounds(panel) {
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  for (const [x, y] of panel.points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
   }
-  return panels;
+  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
-export const LAYOUTS = {
-  grid: { label: 'Classic 2×2 Grid', panels: (gutter) => gridLayout(gutter) },
-  hero: { label: 'Hero + Strips', panels: (gutter) => heroLayout(gutter) },
-};
+// Path a panel's polygon onto a context already scaled to cover pixels.
+export function tracePanelPath(ctx, panel, width, height) {
+  ctx.beginPath();
+  panel.points.forEach(([x, y], index) => {
+    const px = x * width;
+    const py = y * height;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+}
 
-// Default crop for panel i: each panel starts zoomed a little and offset to a
-// different part of the photo, so a single photo reads as a collage of scenes.
-export function defaultCrop(i) {
-  const crops = [
-    // Panel 0 doubles as the hero panel in the hero layout: that slice is very
-    // wide and short, so it keeps zoom near 1 and crops toward the top of the
-    // photo (positive oy) to keep the subject's face in frame.
-    { ox: 0, oy: 0.35, zoom: 1.02 },
-    { ox: -0.18, oy: 0.05, zoom: 1.3 },
-    { ox: 0.15, oy: -0.12, zoom: 1.25 },
-    { ox: -0.05, oy: -0.2, zoom: 1.4 },
-  ];
-  return { ...crops[i % crops.length] };
+// Hit test for the editor: which panel did the user grab? Points are in
+// normalised cover space; a winding fill test over each polygon in order.
+export function panelAtPoint(layout, nx, ny) {
+  for (let i = layout.panels.length - 1; i >= 0; i--) {
+    const pts = layout.panels[i].points;
+    let inside = false;
+    for (let a = 0, b = pts.length - 1; a < pts.length; b = a++) {
+      const [ax, ay] = pts[a];
+      const [bx, by] = pts[b];
+      const crosses = (ay > ny) !== (by > ny);
+      if (crosses && nx < ((bx - ax) * (ny - ay)) / (by - ay) + ax) inside = !inside;
+    }
+    if (inside) return i;
+  }
+  return -1;
+}
+
+// Fresh per-panel placement state for a layout: every panel starts centred
+// on its own photo (spread by index) at natural cover-fit zoom.
+export function defaultPanelStates(layout, photoCount) {
+  return layout.panels.map((_, index) => ({
+    photo: photoCount > 0 ? index % photoCount : -1,
+    cx: 0.5,
+    cy: 0.5,
+    zoom: 1,
+    grade: '',
+  }));
 }
